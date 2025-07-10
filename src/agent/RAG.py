@@ -13,12 +13,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import RetrievalQA
 import csv
 import os
-load_dotenv()
 from pathlib import Path
 
+load_dotenv()
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 CSV_FILE = "summary_application.csv"
-
-
 
 class Appstate(TypedDict):
     documents: List[Document]
@@ -28,7 +28,6 @@ class Appstate(TypedDict):
     confirmed: bool
     submitted: bool
     annual_budget: str 
-
 
 def ask_budget_node(state: Appstate) -> Appstate:
     print("How much are you willing to spend annually?")
@@ -51,10 +50,7 @@ def save_budget_to_csv(state: dict):
             "annual_budget": state.get("annual_budget", "")
         })
 
-
 def save_to_csv(state: dict):
-
-
     CSV_FILE = "application_summaries.csv"
     file_exists = os.path.isfile(CSV_FILE)
 
@@ -69,18 +65,14 @@ def save_to_csv(state: dict):
             "confirmed": state.get("confirmed", False),
             "submitted": state.get("submitted", False)
         })
-    
 
 def save(state: Appstate) -> Appstate:
     print("Saving data")
 
-    # Fallbacks if keys are missing
     summary = state.get("summary", "[No summary]")
     confirmed = state.get("confirmed", False)
     submitted = state.get("submitted", False)
 
-    
-    # Save to CSV
     save_to_csv({
         "summary": summary,
         "confirmed": confirmed,
@@ -88,6 +80,9 @@ def save(state: Appstate) -> Appstate:
     })
 
     print("Save complete.")
+    return state
+
+def budget(state: Appstate) -> Appstate:
     return state
 
 def save_budget(state: Appstate) -> Appstate:
@@ -99,8 +94,6 @@ def save_budget(state: Appstate) -> Appstate:
         "annual_budget": budget,
     })
     return state
-    
-
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a university agent helping someone. "
@@ -114,29 +107,27 @@ prompt = ChatPromptTemplate.from_messages([
              "- Current place of living\n"
              "- Hobbies and passions\n"
              "- Anything else necessary for a university application\n\n"
+             "- Major of choice\n"
              "Documents:\n{context}")
 ])
-
 
 doc_loader = DirectoryLoader("your_docs", loader_cls=UnstructuredFileLoader)
 raw_docs = doc_loader.load()
 print(f"Loaded {len(raw_docs)} raw documents")
 
-
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 split_docs = splitter.split_documents(raw_docs)
 print(f"Split into {len(split_docs)} document chunks")
-
 
 embedding = OpenAIEmbeddings()
 vectorstore = FAISS.from_documents(split_docs, embedding)
 
 retriever = vectorstore.as_retriever()
-llm = ChatOpenAI(temperature = 0)
+llm = ChatOpenAI(temperature=0)
 
 qa_chain = RetrievalQA.from_chain_type(
-    llm = llm,
-    retriever = retriever,
+    llm=llm,
+    retriever=retriever,
     chain_type="stuff",
     chain_type_kwargs={"prompt": prompt}
 )
@@ -149,7 +140,11 @@ def summarize_node(state: Appstate) -> Appstate:
     response = qa_chain.invoke("Please extract all relevant info for university application.")
     summary = response["result"]
     state["summary"] = summary
+    state["confirmed"] = True  # <-- ADDED
+    state["submitted"] = False  # <-- ADDED
     return state
+
+# Build the graph
 
 graph_builder = StateGraph(Appstate)
 graph_builder.add_node("load", load_node)
@@ -164,8 +159,7 @@ graph_builder.add_edge("ask_budget", "saving_budget")
 graph_builder.add_edge("saving_budget", "save")
 graph_builder.add_edge("save", END)
 
-
+# Run it
 graph = graph_builder.compile()
 final_state = graph.invoke({})
 print(final_state["summary"])
-
