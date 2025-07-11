@@ -144,7 +144,14 @@ def process_university(university_name, retries=2):
 
 def scrape_all(input_csv, output_csv):
     df = pd.read_csv(input_csv)
-    fieldnames = ["university", "major", "error"]
+    fieldnames = ["university","label","major","error"]
+
+
+    scraped_universities = set()
+    if os.path.isfile(input_csv):
+        existing_df = pd.read_csv(input_csv)
+        
+        # scraped_universities = set(existing_df['university'].unique())
 
     with open(output_csv, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -153,6 +160,10 @@ def scrape_all(input_csv, output_csv):
 
         for i, row in df.iterrows():
             university = row["university"]
+            if university in scraped_universities:
+                print(f" [SKIPPED] Already scraped: {university}")
+                continue
+
             print(f"\n [{i+1}/{len(df)}] Scraping: {university}")
             results = process_university(university)
             for result in results:
@@ -162,5 +173,6 @@ def scrape_all(input_csv, output_csv):
 
     print(f"\n Done. Data saved to {output_csv}")
 
+
 if __name__ == "__main__":
-    scrape_all("us_universities.csv", "latest_majors.csv")
+    scrape_all("affordable_universities.csv", "latest_majors.csv")

@@ -28,12 +28,44 @@ class Appstate(TypedDict):
     confirmed: bool
     submitted: bool
     annual_budget: str 
+    Major: str
 
 def ask_budget_node(state: Appstate) -> Appstate:
     print("How much are you willing to spend annually?")
     budget = input("Your answer: ").strip()
     print(f"You entered: {budget}")
     state["annual_budget"] = budget
+    return state
+
+def ask_major_node(state: Appstate) -> Appstate:
+    print("What major are you entering")
+    choice = input("Your answer: ").strip()
+    print(f"You entered: {choice}")
+    state["Major"] = choice
+    return state
+
+def save_major_to_csv(state: dict):
+    Filemajor = "major.csv"
+    files = os.path.isfile(Filemajor)
+
+    with open(Filemajor, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["Major"])
+
+        if not files:
+            writer.writeheader()
+
+        writer.writerow({
+            "Major": state.get("Major", "")
+        })
+
+def save_major(state: Appstate) -> Appstate:
+    print("Saving Major")
+    choice = state.get("Major", "[No major provided]")
+    if choice == "[No major provided]":
+        print("Warning: No major provided before save.")
+    save_major_to_csv({
+        "Major": choice,
+    })
     return state
 
 def save_budget_to_csv(state: dict):
@@ -151,12 +183,16 @@ graph_builder.add_node("load", load_node)
 graph_builder.add_node("summarize", summarize_node)
 graph_builder.add_node("ask_budget", ask_budget_node)
 graph_builder.add_node("saving_budget", save_budget)
+graph_builder.add_node("ask_major", ask_major_node)
+graph_builder.add_node("saving_major", save_major)
 graph_builder.add_node("save", save)
 graph_builder.set_entry_point("load")
 graph_builder.add_edge("load", "summarize")
 graph_builder.add_edge("summarize", "ask_budget")
 graph_builder.add_edge("ask_budget", "saving_budget")
-graph_builder.add_edge("saving_budget", "save")
+graph_builder.add_edge("saving_budget", "ask_major")
+graph_builder.add_edge("ask_major", "saving_major")
+graph_builder.add_edge("saving_major", "save")
 graph_builder.add_edge("save", END)
 
 # Run it
